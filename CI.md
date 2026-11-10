@@ -12,7 +12,7 @@ Lint and test run in parallel. Total expected time is roughly 4–11 minutes; co
 
 The image is tagged ghcr.io/<owner>/<repository>:<commit SHA>, with the repository name lowercased for Docker compatibility. It stays local to the runner and is saved as the image-<commit SHA> artifact for seven days. Later jobs can download it with actions/download-artifact@v4 and run docker load -i image.tar. The archive is uploaded before scanning so it remains available for diagnosis even if scanning fails; its existence does not imply that checks passed.
 
-Two Trivy passes implement the requested threshold: the first reports fixable HIGH and CRITICAL vulnerabilities without failing; the second fails on fixable CRITICAL findings. Both ignore unfixed vulnerabilities. Scanner/tool/database errors can also fail the job. Trivy is pinned to a full commit SHA; other actions use major version tags. No separate scan job is needed because scan is part of build. There is no deploy job.
+Two Trivy passes implement the requested threshold: the first reports fixable HIGH and CRITICAL vulnerabilities without failing; the second fails on fixable CRITICAL findings. Both ignore unfixed vulnerabilities. Scanner/tool/database errors can also fail the job. Trivy runs from the versioned aquasec/trivy:0.58.1 container against the saved image archive; both passes share a runner-local database cache. Actions use major version tags. No separate scan job is needed because scan is part of build. There is no deploy job.
 
 ## Container
 
@@ -32,6 +32,10 @@ In branch protection or a ruleset, select lint, test, and build as required chec
 - Updated this document and .steps/analyze.json assumptions.
 - Application source, manifests, and tests are unchanged. The existing health endpoint required no changes.
 
+## Pipeline repair
+
+The published build failed during job setup because the pinned Trivy action referenced aquasecurity/setup-trivy@v0.2.2, which GitHub could not resolve. Replaced both action invocations with direct runs of the versioned Trivy container against the existing image archive. Reporting HIGH/CRITICAL findings, failing on fixable CRITICAL findings, and ignoring unfixed findings remain unchanged. Application files are unchanged.
+
 ## Validation
 
 Inspected source, manifest, tests, analysis, and workflow template offline. No packages were installed and no application, Docker build, or CI jobs were run locally. Execution and vulnerability results must be verified by the first GitHub Actions run. Action availability and remote image contents could not be checked without network access.
@@ -48,3 +52,5 @@ Inspected source, manifest, tests, analysis, and workflow template offline. No p
 - The required distroless Debian 12 nonroot tag is the runtime platform pin; this image does not offer a numeric minor-version tag or a shell healthcheck.
 - Go 1.23 is retained to match go.mod; upgrading the toolchain is outside this change. Scan failures may require a later toolchain or base-image update.
 - CI duration estimates are approximate and depend on caches and runner availability.
+
+- For the repair, use Trivy 0.58.1 as an explicit scanner image version; remote image availability cannot be verified offline.
